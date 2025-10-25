@@ -3,7 +3,7 @@
     "target": "esnext",
     "strict": true,
     "module": "ESNext",
-    "moduleResolution": "bundler",
+    "moduleResolution": "Node",
     "allowSyntheticDefaultImports": true,
     "allowJs": true,
     "baseUrl": "./",
