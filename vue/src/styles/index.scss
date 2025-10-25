@@ -1,4 +1,5 @@
 @import '../../node_modules/normalize.css/normalize';
+@import 'primeicons/primeicons.css';
 @import 'fonts';
 
 *,
@@ -8,7 +9,7 @@
 }
 
 body {
-  font-family: 'IBM Plex mono', sans-serif;
+  font-family: $ff-general, sans-serif;
   font-weight: $fw-normal;
 }
 
