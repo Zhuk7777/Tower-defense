@@ -9,7 +9,9 @@ import { defineProps } from 'vue';
 
 import type { RouterLinkProps } from 'vue-router';
 
-const props = defineProps<RouterLinkProps>();
+export type LinkProps = RouterLinkProps;
+
+const props = defineProps<LinkProps>();
 </script>
 
 <style scoped lang="scss">
