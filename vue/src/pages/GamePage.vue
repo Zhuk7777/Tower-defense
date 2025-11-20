@@ -5,7 +5,6 @@
       class="game-view__zone"
       tabindex="0"
       @click="handleClick"
-      @keydown="handleKeyDown"
       @mousedown="onMouseDown"
       @mouseup="onMouseUp"
       @mouseleave="onMouseLeave"
@@ -21,7 +20,8 @@
         :position="enemy.position"
         :selected="enemy.selected"
         :health="enemy.health"
-        @click="selectEnemy(index)"
+        :max-health="enemy.maxHealth"
+        :type="enemy.type"
       />
       <Tower
         v-for="tower in towers"
@@ -63,7 +63,7 @@ watch(
     if (!isNaN(parsedId) && LEVELS.some((level) => level.id === parsedId)) {
       currentLevel.value = parsedId;
     } else {
-      currentLevel.value = levels.value[0].id;
+      currentLevel.value = LEVELS[0].id;
     }
   },
   { immediate: true }
@@ -72,6 +72,87 @@ watch(
 const levelData = computed(() => {
   return MAPS.find((map) => map.id === currentLevel.value);
 });
+
+const money = ref(0);
+const lives = ref(10);
+
+const spawnConfig = computed(() => {
+  return (
+    (levelData.value && levelData.value.spawn) || {
+      interval: 1000,
+      count: 10,
+      speed: 80,
+      health: 100,
+      reward: 10,
+      type: 'common',
+    }
+  );
+});
+
+const levelPathPercent = computed(() => {
+  return (levelData.value && levelData.value.path) || [];
+});
+
+const spawnState = ref({ timer: 0, remaining: 0, index: 0 });
+
+const getPixelPath = () => {
+  if (!gameZone.value) return [];
+  const rect = gameZone.value.getBoundingClientRect();
+  return levelPathPercent.value.map(
+    (p) => new Point((p.x / 100) * rect.width, (p.y / 100) * rect.height)
+  );
+};
+
+const spawnEnemy = () => {
+  const pixelPath = getPixelPath();
+  if (!pixelPath.length) return;
+
+  const cfg = spawnConfig.value;
+  const start = pixelPath[0];
+
+  let type = cfg.type;
+  let speed = cfg.speed;
+  let health = cfg.health;
+  let reward = cfg.reward;
+
+  if (cfg.enemies && Array.isArray(cfg.enemies) && cfg.enemies.length > 0) {
+    const i = spawnState.value.index || 0;
+    const e = cfg.enemies[Math.min(i, cfg.enemies.length - 1)] || {};
+    type = e.type ?? type;
+    speed = e.speed ?? speed;
+    health = e.health ?? health;
+    reward = e.reward ?? reward;
+  }
+
+  const enemy = new EnemyModel(
+    new Point(start.x, start.y),
+    type,
+    speed,
+    health,
+    reward
+  );
+  enemy.setPath(pixelPath);
+  enemies.value.push(enemy);
+
+  if (cfg.enemies && Array.isArray(cfg.enemies) && cfg.enemies.length > 0) {
+    spawnState.value.index += 1;
+  }
+};
+
+watch(
+  () => levelData.value,
+  () => {
+    spawnState.value.timer = 0;
+    spawnState.value.index = 0;
+    const cfg = spawnConfig.value;
+    spawnState.value.remaining =
+      cfg && Array.isArray(cfg.enemies) && cfg.enemies.length
+        ? cfg.enemies.length
+        : (cfg && cfg.count) || 0;
+    enemies.value = [];
+  },
+  { immediate: true }
+);
 
 const onMouseDown = (event) => {
   const rect = gameZone.value.getBoundingClientRect();
@@ -150,37 +231,39 @@ const handleClick = (event) => {
     if (!isPositionTaken) {
       towers.value.push(new TowerModel(clickPoint));
     }
-  } else {
-    enemies.value.push(new EnemyModel(clickPoint));
   }
-};
-
-const selectEnemy = (index) => {
-  if (selectedEnemy.value === index) {
-    selectedEnemy.value = null;
-  } else {
-    selectedEnemy.value = index;
-  }
-  enemies.value.forEach((enemy, i) => {
-    enemy.selected = i === selectedEnemy.value;
-  });
-};
-
-const handleKeyDown = (event) => {
-  if (selectedEnemy.value === null) return;
-
-  const enemy = enemies.value[selectedEnemy.value];
-  if (!enemy) return;
-
-  enemy.move(event.key);
 };
 
 const updateGame = (deltaTime) => {
+  if (spawnState.value.remaining > 0) {
+    spawnState.value.timer += deltaTime;
+    while (
+      spawnState.value.remaining > 0 &&
+      spawnState.value.timer >= spawnConfig.value.interval
+    ) {
+      spawnState.value.timer -= spawnConfig.value.interval;
+      spawnState.value.remaining -= 1;
+      spawnEnemy();
+    }
+  }
+
+  for (let i = enemies.value.length - 1; i >= 0; i--) {
+    const enemy = enemies.value[i];
+    const reachedEnd = enemy.update(deltaTime);
+    if (reachedEnd) {
+      enemies.value.splice(i, 1);
+      if (selectedEnemy.value === i) {
+        selectedEnemy.value = null;
+      }
+      lives.value = Math.max(0, lives.value - 1);
+    }
+  }
+
   towers.value.forEach((tower) => {
     tower.update(deltaTime);
     if (!tower.canAttack()) return;
 
-    let targetEnemy;
+    let targetEnemy = null;
     let minDistanceSquared = Infinity;
 
     enemies.value.forEach((enemy) => {
@@ -209,6 +292,8 @@ const updateGame = (deltaTime) => {
             selectedEnemy.value = null;
           }
         }
+
+        money.value += targetEnemy.reward || 0;
 
         tower.increaseKills();
       }
