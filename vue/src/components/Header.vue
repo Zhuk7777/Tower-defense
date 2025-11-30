@@ -17,7 +17,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
+import { useStore } from 'vuex';
 
 import Link from '@/components/Link.vue';
 import { ROUTES } from '@/router';
@@ -28,11 +29,8 @@ const items = ref([
   { label: 'Levels', to: { name: ROUTES.LEVELS } },
 ]);
 
-export interface HeaderProps {
-  money: number;
-}
-
-defineProps<HeaderProps>();
+const store = useStore();
+const money = computed(() => store.state.money);
 </script>
 
 <style scoped lang="scss">

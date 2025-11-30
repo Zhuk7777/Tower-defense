@@ -71,8 +71,8 @@ export class TowerModel {
 
   upgrade(cost: number): void {
     this.level++;
-    this.damage = 10 * this.level;
-    this.radius = 100 * this.level;
+    this.damage += 2.5 * this.level;
+    this.radius += 10 * this.level;
     this.totalInvested += cost;
   }
 

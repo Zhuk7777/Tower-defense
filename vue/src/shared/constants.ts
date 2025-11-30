@@ -41,7 +41,7 @@ export const MAPS = [
       ]),
     ],
     path: [new Point(0, 47.5), new Point(100, 47.5)],
-    money: 100, // Начальный бюджет уровня
+    money: 100,
     spawn: {
       interval: 1000,
       count: 15,
